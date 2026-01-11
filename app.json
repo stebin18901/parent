@@ -20,9 +20,6 @@
       }
     },
     "android": {
-      "compileSdkVersion": 35,
-      "targetSdkVersion": 35,
-      "buildToolsVersion": "35.0.0",
       "permissions": [
         "RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
@@ -41,7 +38,9 @@
           "microphonePermission": "Allow YourAppName to access the microphone for live subtitles.",
           "speechRecognitionPermission": "Allow YourAppName to use speech recognition for real-time team communication."
         }
-      ]
+      ],
+      "./plugins/withAndroidManifestFix",
+      "./plugins/withAndroidXOnly"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

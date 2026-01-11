@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage"; // Added for local persistence
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { useStudentStore } from "../../state/useStudentStore";
 import { saveQuizAttempt } from "../../services/firebase/quiz";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function QuizReportScreen() {
   const route = useRoute();
@@ -16,6 +18,7 @@ export default function QuizReportScreen() {
     scorePercent,
     subject,
     chapter,
+    topic, 
   } = route.params;
 
   const [saved, setSaved] = useState(false);
@@ -25,14 +28,22 @@ export default function QuizReportScreen() {
       if (!student?.id || saved) return;
 
       try {
+        // 1. Save to Firebase for long-term records
         await saveQuizAttempt({
           studentId: student.id,
           subject,
           chapter,
+          topic, 
           total,
           correct,
           scorePercent,
+          timestamp: new Date().toISOString(),
         });
+
+        // 2. Save locally so ChapterSelectScreen can show the score immediately
+        const resultKey = `quiz_result_${student.id}_${subject}_${chapter}_${topic}`;
+        await AsyncStorage.setItem(resultKey, scorePercent.toString());
+
       } catch (err) {
         console.log("Quiz attempt save error:", err);
       } finally {
@@ -41,95 +52,70 @@ export default function QuizReportScreen() {
     };
 
     doSave();
-  }, [student?.id, saved, subject, chapter, total, correct, scorePercent]);
+  }, [student?.id, saved, subject, chapter, topic, total, correct, scorePercent]);
 
   const wrong = total - correct;
 
+  /* Performance Logic */
   let performanceLabel = "Keep Practicing";
-  if (scorePercent >= 80) performanceLabel = "Excellent";
-  else if (scorePercent >= 60) performanceLabel = "Good";
-  else if (scorePercent >= 40) performanceLabel = "Needs Improvement";
+  let performanceIcon = "rocket-outline";
+  
+  if (scorePercent >= 80) {
+    performanceLabel = "Excellent!";
+    performanceIcon = "trophy";
+  } else if (scorePercent >= 60) {
+    performanceLabel = "Well Done!";
+    performanceIcon = "star";
+  } else if (scorePercent >= 40) {
+    performanceLabel = "Good Effort";
+    performanceIcon = "thumbs-up";
+  }
 
   return (
-    <LinearGradient
-      colors={["#F8FAFF", "#FFF4EC"]}
-      style={styles.root}
-    >
-      <Text style={styles.title}>Quiz Report</Text>
-      <Text style={styles.subTitle}>
-        {subject} - {chapter}
-      </Text>
+    <LinearGradient colors={["#F8FAFF", "#FFF4EC"]} style={styles.root}>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Topic Completed</Text>
+        <Text style={styles.subTitle}>
+          {chapter} • {topic}
+        </Text>
+      </View>
 
-      {/* ✅ SCORE CARD */}
-      <LinearGradient
-        colors={["#FFF7ED", "#FFFBEB"]}
-        style={styles.scoreCard}
-      >
-        <Text style={styles.scoreLabel}>Score</Text>
+      {/* SCORE CARD */}
+      <LinearGradient colors={["#FFF7ED", "#FFFBEB"]} style={styles.scoreCard}>
+        <Ionicons name={performanceIcon} size={48} color="#B45309" style={{ marginBottom: 10 }} />
+        <Text style={styles.scoreLabel}>YOUR SCORE</Text>
         <Text style={styles.scoreValue}>{scorePercent}%</Text>
         <Text style={styles.scoreTag}>{performanceLabel}</Text>
       </LinearGradient>
 
-      {/* ✅ STATS */}
+      {/* STATS */}
       <View style={styles.statsRow}>
-        <LinearGradient
-          colors={["#FFFFFF", "#F8FAFC"]}
-          style={styles.statBox}
-        >
-          <Text style={styles.statNumber}>{total}</Text>
-          <Text style={styles.statLabel}>Questions</Text>
-        </LinearGradient>
-
-        <LinearGradient
-          colors={["#ECFDF5", "#DCFCE7"]}
-          style={styles.statBox}
-        >
-          <Text style={[styles.statNumber, { color: "#16A34A" }]}>
-            {correct}
-          </Text>
-          <Text style={styles.statLabel}>Correct</Text>
-        </LinearGradient>
-
-        <LinearGradient
-          colors={["#FEF2F2", "#FEE2E2"]}
-          style={styles.statBox}
-        >
-          <Text style={[styles.statNumber, { color: "#DC2626" }]}>
-            {wrong}
-          </Text>
-          <Text style={styles.statLabel}>Wrong</Text>
-        </LinearGradient>
+        <StatItem label="Questions" value={total} colors={["#FFFFFF", "#F8FAFC"]} />
+        <StatItem label="Correct" value={correct} colors={["#ECFDF5", "#DCFCE7"]} textColor="#16A34A" />
+        <StatItem label="Wrong" value={wrong} colors={["#FEF2F2", "#FEE2E2"]} textColor="#DC2626" />
       </View>
 
-      {/* ✅ FOOTER BUTTONS */}
+      {/* FOOTER BUTTONS */}
       <View style={styles.footerButtons}>
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() => navigation.popToTop()}
+          style={styles.shadowWrapper}
         >
-          <LinearGradient
-            colors={["#FFB347", "#FF9F1C"]}
-            style={styles.primaryBtn}
-          >
-            <Text style={styles.primaryBtnText}>
-              Back to Home
-            </Text>
+          <LinearGradient colors={["#FFB347", "#FF9F1C"]} style={styles.primaryBtn}>
+            <Text style={styles.primaryBtnText}>Continue Journey</Text>
           </LinearGradient>
         </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={() =>
-            navigation.replace("QuizPlay", { subject, chapter })
+            navigation.replace("QuizPlay", { subject, chapter, topic })
           }
         >
-          <LinearGradient
-            colors={["#F1F5F9", "#E5E7EB"]}
-            style={styles.secondaryBtn}
-          >
-            <Text style={styles.secondaryBtnText}>
-              Retry Quiz
-            </Text>
+          <LinearGradient colors={["#F1F5F9", "#E5E7EB"]} style={styles.secondaryBtn}>
+            <Text style={styles.secondaryBtnText}>Retry Topic</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -137,111 +123,49 @@ export default function QuizReportScreen() {
   );
 }
 
-/* ✅ STYLES */
+const StatItem = ({ label, value, colors, textColor = "#111827" }) => (
+  <LinearGradient colors={colors} style={styles.statBox}>
+    <Text style={[styles.statNumber, { color: textColor }]}>{value}</Text>
+    <Text style={styles.statLabel}>{label}</Text>
+  </LinearGradient>
+);
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    padding: 20,
-  },
-
-  title: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: "#111827",
-  },
-
-  subTitle: {
-    fontSize: 14,
-    color: "#6B7280",
-    marginBottom: 22,
-    fontWeight: "600",
-  },
-
+  root: { flex: 1, padding: 24, paddingTop: 60 },
+  header: { marginBottom: 30 },
+  title: { fontSize: 28, fontWeight: "900", color: "#111827" },
+  subTitle: { fontSize: 14, color: "#6B7280", marginTop: 4, fontWeight: "600" },
+  
   scoreCard: {
-    borderRadius: 22,
-    paddingVertical: 26,
-    paddingHorizontal: 16,
+    borderRadius: 30,
+    paddingVertical: 35,
     alignItems: "center",
-    marginBottom: 22,
-    elevation: 4,
+    marginBottom: 25,
+    elevation: 8,
+    shadowColor: "#B45309",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 15,
   },
+  scoreLabel: { fontSize: 12, color: "#92400E", fontWeight: "800", letterSpacing: 1 },
+  scoreValue: { fontSize: 50, fontWeight: "900", color: "#B45309", marginVertical: 5 },
+  scoreTag: { fontSize: 18, fontWeight: "800", color: "#92400E" },
 
-  scoreLabel: {
-    fontSize: 13,
-    color: "#92400E",
-    fontWeight: "600",
-  },
+  statsRow: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
+  statBox: { flex: 1, borderRadius: 20, paddingVertical: 20, alignItems: "center", elevation: 3 },
+  statNumber: { fontSize: 20, fontWeight: "900" },
+  statLabel: { fontSize: 11, color: "#6B7280", marginTop: 4, fontWeight: "700" },
 
-  scoreValue: {
-    fontSize: 38,
-    fontWeight: "900",
-    color: "#B45309",
-    marginVertical: 4,
-  },
-
-  scoreTag: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#92400E",
-  },
-
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 12,
-  },
-
-  statBox: {
-    flex: 1,
-    marginHorizontal: 4,
-    borderRadius: 18,
-    paddingVertical: 16,
-    alignItems: "center",
-    elevation: 3,
-  },
-
-  statNumber: {
-    fontSize: 18,
-    fontWeight: "900",
-    color: "#111827",
-  },
-
-  statLabel: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 4,
-    fontWeight: "600",
-  },
-
-  footerButtons: {
-    marginTop: 34,
-  },
-
-  primaryBtn: {
-    paddingVertical: 15,
-    borderRadius: 22,
-    marginBottom: 14,
-    alignItems: "center",
-    elevation: 4,
-  },
-
-  primaryBtnText: {
-    color: "#FFFFFF",
-    fontWeight: "900",
-    fontSize: 15,
-  },
-
-  secondaryBtn: {
-    paddingVertical: 13,
-    borderRadius: 22,
-    alignItems: "center",
-    elevation: 2,
-  },
-
-  secondaryBtnText: {
-    color: "#374151",
-    fontWeight: "800",
-    fontSize: 14,
-  },
+  footerButtons: { marginTop: "auto", paddingBottom: 20 },
+  primaryBtn: { paddingVertical: 18, borderRadius: 22, alignItems: "center" },
+  primaryBtnText: { color: "#FFFFFF", fontWeight: "900", fontSize: 16 },
+  secondaryBtn: { paddingVertical: 15, borderRadius: 22, alignItems: "center", marginTop: 12 },
+  secondaryBtnText: { color: "#4B5563", fontWeight: "800", fontSize: 14 },
+  shadowWrapper: { 
+    elevation: 5, 
+    shadowColor: "#FF9F1C", 
+    shadowOpacity: 0.3, 
+    shadowRadius: 10, 
+    shadowOffset: { width: 0, height: 5 } 
+  }
 });
