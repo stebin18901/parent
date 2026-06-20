@@ -89,6 +89,7 @@ export const saveQuizAttempt = async ({
     const prevCorrect = data.totalCorrectAnswers || 0;
     const prevWrong = data.totalWrongAnswers || 0;
     const prevAvgScore = data.avgScore || 0;
+    const prevXp = data.xp || 0;
 
     const newAttempts = prevAttempts + 1;
     const newTotalCorrect = prevCorrect + correct;
@@ -101,6 +102,8 @@ export const saveQuizAttempt = async ({
 
     const newAvgScore =
       (prevAvgScore * prevAttempts + scorePercent) / newAttempts;
+    const xpEarned = 5 + (Number(scorePercent) === 100 ? 5 : 0);
+    const newXp = prevXp + xpEarned;
 
     transaction.update(studentRef, {
       totalQuizzesAttempted: newAttempts,
@@ -108,6 +111,7 @@ export const saveQuizAttempt = async ({
       totalWrongAnswers: newTotalWrong,
       avgAccuracy: newAccuracy,
       avgScore: newAvgScore,
+      xp: newXp,
     });
 
     const attemptRef = doc(historyCollectionRef);
@@ -150,15 +154,22 @@ export const getFullChapterQuiz = async (studentClass, subject, chapter) => {
   if (snap.empty) return null;
 
   let allQuestions = [];
+  const notesByConcept = {};
 
   snap.docs.forEach((d) => {
     const data = d.data();
     const questions = data.questions || [];
+    const concept = data.metadata?.concept || "General";
+
+    if (data.noteHtml) {
+      notesByConcept[concept] = data.noteHtml;
+    }
 
     questions.forEach((q) => {
       allQuestions.push({
         ...q,
-        concept: data.metadata?.concept || "General",
+        concept,
+        noteHtml: data.noteHtml || "",
       });
     });
   });
@@ -168,5 +179,6 @@ export const getFullChapterQuiz = async (studentClass, subject, chapter) => {
     chapter,
     totalQuestions: allQuestions.length,
     questions: allQuestions,
+    notesByConcept,
   };
 };

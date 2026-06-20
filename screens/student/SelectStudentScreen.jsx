@@ -1,18 +1,22 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
   FlatList,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   Alert,
   Image,
   SafeAreaView,
-  Dimensions,
+  StatusBar,
+  useWindowDimensions,
+  Animated,
+  Pressable,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 import { getStudentsByParent } from "../../services/firebase/student";
 import { logoutParent } from "../../services/firebase/auth";
@@ -20,37 +24,27 @@ import { logoutParent } from "../../services/firebase/auth";
 import { useAuthStore } from "../../state/useAuthStore";
 import { useStudentStore } from "../../state/useStudentStore";
 
-const { width } = Dimensions.get("window");
-
-/* ───────── ADVANCED COLOR SYSTEM ───────── */
 const COLORS = {
-  bgTop: "#000000ff",
-  bgMid: "#101010ff",
-  bgBottom: "#414141ff",
-
-  glass: "rgba(43, 43, 43, 0.96)",
-  border: "rgba(255,255,255,0.18)",
-
-  textMain: "#ffffffff",
-  textMuted: "#b5b5b5ff",
-
-  gold: "#EAB308",
-  goldDark: "#CA8A04",
-
-  successBg: "#ECFDF5",
-  successText: "#15803D",
+  primary: "#6366F1",
+  secondary: "#8B5CF6",
+  bg1: "#F8FAFF",
+  bg2: "#EEF2FF",
+  text: "#0F172A",
+  sub: "#64748B",
 };
 
 export default function SelectStudentScreen({ navigation }) {
+  const { width } = useWindowDimensions();
+
   const parent = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const setStudents = useStudentStore((s) => s.setStudents);
-  const setSelectedStudent = useStudentStore(
-    (s) => s.setSelectedStudent
-  );
+  const setSelectedStudent = useStudentStore((s) => s.setSelectedStudent);
 
   const [loading, setLoading] = useState(true);
   const [students, setLocalStudents] = useState([]);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(
     useCallback(() => {
@@ -60,6 +54,12 @@ export default function SelectStudentScreen({ navigation }) {
           const data = await getStudentsByParent(parent.uid);
           setLocalStudents(data);
           setStudents(data);
+
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+          }).start();
         } catch (e) {
           Alert.alert("Error", e.message);
         } finally {
@@ -86,236 +86,239 @@ export default function SelectStudentScreen({ navigation }) {
     ]);
   };
 
+  const renderItem = ({ item, index }) => {
+    const scale = new Animated.Value(1);
+
+    const onPressIn = () => {
+      Animated.spring(scale, {
+        toValue: 0.96,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    const onPressOut = () => {
+      Animated.spring(scale, {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      }).start();
+    };
+
+    return (
+      <Animated.View
+        style={{
+          opacity: fadeAnim,
+          transform: [
+            { scale },
+            {
+              translateY: fadeAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [40, 0],
+              }),
+            },
+          ],
+        }}
+      >
+        <Pressable
+          onPressIn={onPressIn}
+          onPressOut={onPressOut}
+          onPress={() => {
+            setSelectedStudent(item);
+            navigation.replace("ParentHome");
+          }}
+        >
+          <BlurView intensity={50} tint="light" style={styles.card}>
+            <View style={styles.left}>
+              {item.profilePic ? (
+                <Image source={{ uri: item.profilePic }} style={styles.avatar} />
+              ) : (
+                <LinearGradient
+                  colors={[COLORS.primary, COLORS.secondary]}
+                  style={styles.avatarFallback}
+                >
+                  <Text style={styles.avatarText}>
+                    {item.name?.[0]?.toUpperCase()}
+                  </Text>
+                </LinearGradient>
+              )}
+
+              <View>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.meta}>
+                  Class {item.class} • {item.section || "A"}
+                </Text>
+              </View>
+            </View>
+
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={26}
+              color="#CBD5F5"
+            />
+          </BlurView>
+        </Pressable>
+      </Animated.View>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" color={COLORS.gold} />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <LinearGradient
-        colors={[COLORS.bgTop, COLORS.bgMid, COLORS.bgBottom]}
-        locations={[0, 0.35, 1]}
-        style={{ flex: 1 }}
-      >
-        {/* ───────── HERO HEADER ───────── */}
-        <View style={styles.hero}>
-          <Text style={styles.heroTitle}>Choose Student</Text>
-          <Text style={styles.heroSub}>
-            Continue learning with the selected profile
-          </Text>
+      <StatusBar barStyle="dark-content" />
 
-          <TouchableOpacity onPress={handleLogout}>
-            <Text style={styles.logout}>Logout</Text>
-          </TouchableOpacity>
+      <LinearGradient colors={[COLORS.bg1, COLORS.bg2]} style={{ flex: 1 }}>
+        {/* HEADER */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>Select Student</Text>
+            <Text style={styles.subtitle}>Manage profiles easily</Text>
+          </View>
+
+          <Pressable onPress={handleLogout} style={styles.logout}>
+            <MaterialCommunityIcons name="logout" size={20} />
+          </Pressable>
         </View>
 
-        {/* ───────── STUDENT LIST ───────── */}
+        {/* LIST */}
         <FlatList
           data={students}
           keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={{ padding: 16, paddingBottom: 140 }}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: 20,
-            paddingBottom: 160,
-          }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              activeOpacity={0.92}
-              style={styles.card}
-              onPress={() => {
-                setSelectedStudent(item);
-                navigation.replace("ParentHome");
-              }}
-            >
-              <View style={styles.cardLeft}>
-                {item.profilePic ? (
-                  <Image
-                    source={{ uri: item.profilePic }}
-                    style={styles.avatar}
-                  />
-                ) : (
-                  <View style={styles.avatarFallback}>
-                    <Text style={styles.avatarText}>
-                      {item.name?.[0]?.toUpperCase() || "S"}
-                    </Text>
-                  </View>
-                )}
-
-                <View>
-                  <Text style={styles.name}>{item.name}</Text>
-                  <Text style={styles.meta}>
-                    Class {item.class}
-                    {item.section ? ` · ${item.section}` : ""}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.statusPill}>
-                <Text style={styles.statusText}>
-                  {item.status || "Active"}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              No student profiles yet.
-            </Text>
+            <View style={styles.empty}>
+              <MaterialCommunityIcons name="account-off" size={70} color="#CBD5F5" />
+              <Text style={styles.emptyText}>No Students Found</Text>
+            </View>
           }
         />
 
-        {/* ───────── FLOATING CTA ───────── */}
-        <View style={styles.ctaWrap}>
-          <TouchableOpacity
-            activeOpacity={0.95}
-            onPress={() => navigation.navigate("CreateStudent")}
-          >
+        {/* FLOATING CTA */}
+        <Animated.View style={styles.ctaWrapper}>
+          <Pressable onPress={() => navigation.navigate("CreateStudent")}>
             <LinearGradient
-              colors={[COLORS.gold, COLORS.goldDark]}
+              colors={[COLORS.primary, COLORS.secondary]}
               style={styles.cta}
             >
+              <MaterialCommunityIcons name="plus" size={22} color="#fff" />
               <Text style={styles.ctaText}>Add Student</Text>
             </LinearGradient>
-          </TouchableOpacity>
-        </View>
+          </Pressable>
+        </Animated.View>
       </LinearGradient>
     </SafeAreaView>
   );
 }
 
-/* ───────── STYLES ───────── */
-
-const SHADOW_GLASS = {
-  shadowColor: "#000",
-  shadowOpacity: 0.12,
-  shadowRadius: 24,
-  shadowOffset: { width: 0, height: 14 },
-  elevation: 8,
-};
-
 const styles = StyleSheet.create({
-  loader: {
-    flex: 1,
-    justifyContent: "center",
-    backgroundColor: COLORS.bgBottom,
-  },
+  loader: { flex: 1, justifyContent: "center" },
 
-  hero: {
-    paddingTop: 28,
-    paddingHorizontal: 22,
-    paddingBottom: 18,
-  },
-  heroTitle: {
-    fontSize: 30,
-    fontWeight: "900",
-    color: "#FFFFFF",
-  },
-  heroSub: {
-    fontSize: 14,
-    color: "#CBD5E1",
-    marginTop: 6,
-  },
-  logout: {
-    marginTop: 10,
-    fontSize: 13,
-    color: "#94A3B8",
-    fontWeight: "600",
-  },
-
-  card: {
-    backgroundColor: COLORS.glass,
-    borderRadius: 50,
-    padding: 18,
-    marginBottom: 16,
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
+    padding: 20,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    ...SHADOW_GLASS,
   },
 
-  cardLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-
-  avatar: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-  },
-
-  avatarFallback: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: COLORS.gold,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  avatarText: {
-    color: "#111827",
-    fontSize: 22,
+  title: {
+    fontSize: 30,
     fontWeight: "900",
+    color: "#0F172A",
   },
 
-  name: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: COLORS.textMain,
-  },
-
-  meta: {
-    fontSize: 13,
-    color: COLORS.textMuted,
+  subtitle: {
+    color: "#64748B",
     marginTop: 4,
   },
 
-  statusPill: {
-    backgroundColor: COLORS.successBg,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 999,
+  logout: {
+    backgroundColor: "#E2E8F0",
+    padding: 10,
+    borderRadius: 12,
   },
 
-  statusText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: COLORS.successText,
+  card: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 16,
+    borderRadius: 22,
+    marginBottom: 14,
+    backgroundColor: "rgba(255,255,255,0.6)",
+  },
+
+  left: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+  },
+
+  avatarFallback: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  avatarText: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "800",
+  },
+
+  name: {
+    fontSize: 17,
+    fontWeight: "800",
+  },
+
+  meta: {
+    color: "#64748B",
+    fontSize: 13,
+  },
+
+  empty: {
+    alignItems: "center",
+    marginTop: 100,
   },
 
   emptyText: {
-    textAlign: "center",
-    marginTop: 80,
-    fontSize: 14,
-    color: COLORS.textMuted,
+    marginTop: 10,
+    color: "#94A3B8",
   },
 
-  ctaWrap: {
+  ctaWrapper: {
     position: "absolute",
     bottom: 30,
-    left: 24,
-    right: 24,
+    left: 20,
+    right: 20,
   },
 
   cta: {
-    paddingVertical: 18,
-    borderRadius: 26,
+    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    ...SHADOW_GLASS,
+    padding: 18,
+    borderRadius: 20,
+    gap: 10,
   },
 
   ctaText: {
-    color: "#0B1220",
+    color: "#fff",
+    fontWeight: "800",
     fontSize: 16,
-    fontWeight: "900",
-    letterSpacing: 0.4,
   },
 });

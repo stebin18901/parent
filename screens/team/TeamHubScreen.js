@@ -11,8 +11,11 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  SafeAreaView,
+  StatusBar,
 } from "react-native";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useStudentStore } from "../../state/useStudentStore";
 import {
   createTeam,
@@ -26,7 +29,6 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-
 export default function TeamHubScreen() {
   const navigation = useNavigation();
   const student = useStudentStore((s) => s.selectedStudent);
@@ -36,16 +38,14 @@ export default function TeamHubScreen() {
   const [loading, setLoading] = useState(false);
   const [teams, setTeams] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-
   const [mode, setMode] = useState("none"); // none | create | join
 
-  /* ✅ LOAD MY TEAMS */
   const loadTeams = async () => {
     if (!student?.id) return;
     setRefreshing(true);
     try {
       const res = await getMyTeams(student.id);
-      setTeams(res);
+      setTeams(res || []);
     } catch (err) {
       console.log("load teams error:", err);
     } finally {
@@ -59,14 +59,12 @@ export default function TeamHubScreen() {
     }, [student?.id])
   );
 
-  /* ✅ CREATE TEAM */
   const handleCreateTeam = async () => {
+    if (teams.length >= 3) return Alert.alert("Limit Reached", "You can only be in 3 teams.");
     if (!teamName.trim()) return Alert.alert("Team name required");
-    if (!student?.id) return Alert.alert("No student selected");
 
     try {
       setLoading(true);
-
       const res = await createTeam({
         studentId: student.id,
         name: teamName.trim(),
@@ -74,10 +72,15 @@ export default function TeamHubScreen() {
         studentClass: student.class,
       });
 
-      Alert.alert("Team Created", `Team Code: ${res.joinCode}`);
+      Alert.alert("Success!", `Team Created. Code: ${res.joinCode}`);
       setTeamName("");
       setMode("none");
       await loadTeams();
+      navigation.navigate("TeamChat", {
+        teamId: res.teamId,
+        teamName: teamName.trim(),
+        joinCode: res.joinCode,
+      });
     } catch (err) {
       Alert.alert("Error", err.message || "Failed to create team");
     } finally {
@@ -85,21 +88,17 @@ export default function TeamHubScreen() {
     }
   };
 
-  /* ✅ JOIN TEAM */
   const handleJoinTeam = async () => {
     const code = joinCode.trim().toUpperCase();
     if (!code) return Alert.alert("Enter a team code");
-    if (!student?.id) return Alert.alert("No student selected");
 
     try {
       setLoading(true);
       const team = await findTeamByJoinCode(code);
-
-      if (!team) return Alert.alert("No team found");
+      if (!team) return Alert.alert("Not Found", "No team found with this code.");
 
       await requestJoinTeam({ teamId: team.id, student });
-
-      Alert.alert("Request Sent");
+      Alert.alert("Requested", "Your request to join has been sent to the captain.");
       setJoinCode("");
       setMode("none");
     } catch (err) {
@@ -110,301 +109,246 @@ export default function TeamHubScreen() {
   };
 
   const switchMode = (next) => {
-    LayoutAnimation.easeInEaseOut();
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setMode(next);
   };
 
-  return (
-    <LinearGradient colors={["#F8FAFF", "#FFF4EC"]} style={styles.root}>
-      <Text style={styles.title}>Teams</Text>
-      <Text style={styles.subTitle}>
-        Create or join teams. You can be in maximum 3 teams.
-      </Text>
+  const renderTeamItem = ({ item }) => {
+    const isHost = item.hostStudentId === student?.id;
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={styles.teamCardWrapper}
+        onPress={() => navigation.navigate("TeamChat", {
+          teamId: item.id,
+          teamName: item.name,
+          joinCode: item.joinCode,
+        })}
+      >
+        <View style={styles.teamRow}>
+          <View style={styles.teamInfo}>
+            <View style={styles.iconCircle}>
+              <MaterialCommunityIcons name="account-group" size={24} color="#FF9F1C" />
+            </View>
+            <View>
+              <Text style={styles.teamName}>{item.name}</Text>
+              <Text style={styles.teamMeta}>
+                Code: <Text style={styles.boldCode}>{item.joinCode}</Text> • {item.memberCount || 1} Members
+              </Text>
+            </View>
+          </View>
 
-      {/* ✅ SINGLE SMART CARD */}
-      <LinearGradient colors={["#FFFFFF", "#FFF7ED"]} style={styles.smartCard}>
-        {/* ✅ HEADER */}
-        <View style={styles.smartHeader}>
-          <Text style={styles.cardTitle}>
-            {mode === "create"
-              ? "Create Team"
-              : mode === "join"
-              ? "Join Team"
-              : "Create or Join a Team"}
-          </Text>
-
-          {mode === "none" && (
+          {isHost ? (
             <TouchableOpacity
-              style={styles.plusBtn}
-              onPress={() => switchMode("create")}
+              onPress={() => navigation.navigate("TeamJoinRequests", { teamId: item.id, teamName: item.name })}
             >
-              <Text style={styles.plusText}>＋</Text>
+              <LinearGradient colors={["#60A5FA", "#2563EB"]} style={styles.requestBtn}>
+                <Text style={styles.requestBtnText}>Requests</Text>
+              </LinearGradient>
             </TouchableOpacity>
+          ) : (
+            <MaterialCommunityIcons name="chevron-right" size={24} color="#CBD5E1" />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <StatusBar barStyle="dark-content" />
+      <LinearGradient colors={["#F8FAFF", "#F1F5F9"]} style={styles.root}>
+        
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>Team Hub</Text>
+            <View style={styles.limitBadge}>
+              <Text style={styles.limitText}>{teams.length}/3 Teams Active</Text>
+            </View>
+          </View>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeText}>LIVE</Text>
+          </View>
+        </View>
+
+        {/* Action Card */}
+        <View style={[styles.smartCard, mode !== 'none' && styles.expandedCard]}>
+          <View style={styles.smartHeader}>
+            <View style={styles.cardTitleRow}>
+              {mode !== "none" && (
+                <TouchableOpacity onPress={() => switchMode("none")} style={styles.backBtn}>
+                  <MaterialCommunityIcons name="arrow-left" size={20} color="#64748B" />
+                </TouchableOpacity>
+              )}
+              <Text style={styles.cardTitle}>
+                {mode === "create" ? "Create New Team" : mode === "join" ? "Join a Team" : "Team Options"}
+              </Text>
+            </View>
+
+            {mode === "none" && (
+              <View style={styles.actionRow}>
+                <TouchableOpacity style={styles.actionBtnGhost} onPress={() => switchMode("join")}>
+                  <Text style={styles.actionGhostText}>Join</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.actionBtnPrimary, teams.length >= 3 && { opacity: 0.5 }]} 
+                  onPress={() => teams.length < 3 ? switchMode("create") : Alert.alert("Limit Reached")}
+                >
+                  <Text style={styles.actionPrimaryText}>Create</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {mode === "create" && (
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: The Avengers"
+                placeholderTextColor="#94A3B8"
+                value={teamName}
+                onChangeText={setTeamName}
+                maxLength={20}
+              />
+              <TouchableOpacity onPress={handleCreateTeam} disabled={loading}>
+                <LinearGradient colors={["#FFB347", "#FF9F1C"]} style={styles.primaryBtn}>
+                  {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryText}>Launch Team</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {mode === "join" && (
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={[styles.input, styles.codeInput]}
+                placeholder="ENTER CODE"
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="characters"
+                value={joinCode}
+                onChangeText={setJoinCode}
+                maxLength={6}
+              />
+              <TouchableOpacity onPress={handleJoinTeam} disabled={loading}>
+                <LinearGradient colors={["#475569", "#1E293B"]} style={styles.primaryBtn}>
+                  {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryText}>Send Join Request</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
-        {/* ✅ CREATE MODE */}
-        {mode === "create" && (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter team name"
-              value={teamName}
-              onChangeText={setTeamName}
-            />
+        {/* My Teams Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Your Groups</Text>
+          {refreshing && <ActivityIndicator size="small" color="#FF9F1C" />}
+        </View>
 
-            <TouchableOpacity onPress={handleCreateTeam} disabled={loading}>
-              <LinearGradient
-                colors={["#FFB347", "#FF9F1C"]}
-                style={styles.primaryBtn}
-              >
-                <Text style={styles.primaryText}>
-                  {loading ? "Please wait..." : "Create Team"}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* ✅ SMALL JOIN SWITCH */}
-            <TouchableOpacity
-              style={styles.smallSwitch}
-              onPress={() => switchMode("join")}
-            >
-              <Text style={styles.switchText}>
-                Have a code? Join a team →
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {/* ✅ JOIN MODE */}
-        {mode === "join" && (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter team code"
-              autoCapitalize="characters"
-              value={joinCode}
-              onChangeText={setJoinCode}
-            />
-
-            <TouchableOpacity onPress={handleJoinTeam} disabled={loading}>
-              <LinearGradient
-                colors={["#E5E7EB", "#F1F5F9"]}
-                style={styles.secondaryBtn}
-              >
-                <Text style={styles.secondaryText}>
-                  {loading ? "Please wait..." : "Request to Join"}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* ✅ SMALL CREATE SWITCH */}
-            <TouchableOpacity
-              style={styles.smallSwitch}
-              onPress={() => switchMode("create")}
-            >
-              <Text style={styles.switchText}>
-                Want to start your own team? Create →
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </LinearGradient>
-
-      {/* ✅ MY TEAMS */}
-      <Text style={styles.sectionTitle}>Your Teams</Text>
-
-      {refreshing ? (
-        <ActivityIndicator color="#FF9F1C" />
-      ) : (
         <FlatList
           data={teams}
           keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <LinearGradient
-              colors={["#FFFFFF", "#FFF7ED"]}
-              style={styles.teamRow}
-            >
-              <View>
-                <Text style={styles.teamName}>{item.name}</Text>
-                <Text style={styles.teamMeta}>
-                  Code: {item.joinCode} · Members: {item.memberCount || 1}
-                </Text>
-              </View>
-
-              {item.hostStudentId === student?.id && (
-                <TouchableOpacity
-                  onPress={() =>
-                    navigation.navigate("TeamJoinRequests", {
-                      teamId: item.id,
-                      teamName: item.name,
-                    })
-                  }
-                >
-                  <LinearGradient
-                    colors={["#60A5FA", "#2563EB"]}
-                    style={styles.requestBtn}
-                  >
-                    <Text style={styles.requestBtnText}>View Requests</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              )}
-            </LinearGradient>
-          )}
+          renderItem={renderTeamItem}
+          contentContainerStyle={{ paddingBottom: 100 }}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              You are not in any team yet.
-            </Text>
+            <View style={styles.emptyContainer}>
+              <MaterialCommunityIcons name="account-group-outline" size={60} color="#CBD5E1" />
+              <Text style={styles.emptyText}>You haven't joined any teams yet.</Text>
+            </View>
           }
+          refreshing={refreshing}
+          onRefresh={loadTeams}
         />
-      )}
-    </LinearGradient>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
-/* ✅ STYLES */
-
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 16 },
+  safe: { flex: 1, backgroundColor: "#F8FAFF" },
+  root: { flex: 1, paddingHorizontal: 20, paddingTop: 10 },
 
-  title: { fontSize: 22, fontWeight: "900", color: "#111827" },
-
-  subTitle: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginBottom: 16,
-    fontWeight: "600",
-  },
-
-  smartCard: {
-    borderRadius: 2,
-    padding: 16,
-    marginBottom: 14,
-    elevation: 4,
-  },
-
-  smartHeader: {
+  header: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  plusBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#FF9F1C",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  plusText: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "900",
-  },
-
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "900",
-    color: "#111827",
-  },
-
-  input: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginVertical: 12,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-
-  primaryBtn: {
-    paddingVertical: 12,
-    borderRadius: 18,
-    alignItems: "center",
-    elevation: 4,
-  },
-
-  primaryText: {
-    color: "#FFFFFF",
-    fontWeight: "900",
-    fontSize: 14,
-  },
-
-  secondaryBtn: {
-    paddingVertical: 12,
-    borderRadius: 18,
-    alignItems: "center",
-  },
-
-  secondaryText: {
-    color: "#111827",
-    fontWeight: "800",
-    fontSize: 14,
-  },
-
-  smallSwitch: {
+    alignItems: "flex-start",
+    marginBottom: 20,
     marginTop: 10,
-    alignItems: "center",
   },
-
-  switchText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#2563EB",
-  },
-
-  sectionTitle: {
-    marginTop: 10,
-    marginBottom: 8,
-    fontSize: 15,
-    fontWeight: "900",
-    color: "#111827",
-  },
-
-  teamRow: {
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    elevation: 3,
-  },
-
-  teamName: {
-    fontSize: 14,
-    fontWeight: "900",
-    color: "#111827",
-  },
-
-  teamMeta: {
-    fontSize: 12,
-    color: "#6B7280",
-  },
-
-  requestBtn: {
+  title: { fontSize: 28, fontWeight: "900", color: "#0F172A", letterSpacing: -0.5 },
+  limitBadge: { backgroundColor: "#FEF3C7", alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginTop: 4 },
+  limitText: { fontSize: 11, color: "#D97706", fontWeight: "700" },
+  headerBadge: {
+    backgroundColor: "#DCFCE7",
+    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 10,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
   },
+  headerBadgeText: { fontSize: 10, fontWeight: "900", color: "#166534" },
 
-  requestBtnText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "900",
+  smartCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 25,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    ...Platform.select({
+      ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 },
+      android: { elevation: 3 },
+    }),
   },
+  expandedCard: { borderColor: "#FDE68A", backgroundColor: "#FFFEFA" },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center' },
+  backBtn: { marginRight: 10, padding: 4, backgroundColor: '#F1F5F9', borderRadius: 8 },
+  smartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  cardTitle: { fontSize: 16, fontWeight: "800", color: "#1E293B" },
 
-  emptyText: {
-    fontSize: 13,
-    color: "#6B7280",
-    marginTop: 16,
-    textAlign: "center",
-    fontWeight: "600",
+  actionRow: { flexDirection: "row", gap: 10 },
+  actionBtnGhost: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: "#F8FAFC", borderWidth: 1, borderColor: "#E2E8F0" },
+  actionGhostText: { fontSize: 13, fontWeight: "700", color: "#64748B" },
+  actionBtnPrimary: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: "#FF9F1C" },
+  actionPrimaryText: { fontSize: 13, fontWeight: "700", color: "#FFFFFF" },
+
+  inputContainer: { marginTop: 20 },
+  input: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    color: "#1E293B",
+    marginBottom: 15,
   },
+  codeInput: { textAlign: 'center', letterSpacing: 4, fontWeight: '800', fontSize: 18 },
+  primaryBtn: { paddingVertical: 15, borderRadius: 15, alignItems: "center" },
+  primaryText: { color: "#FFFFFF", fontWeight: "800", fontSize: 15 },
+
+  sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 15 },
+  sectionTitle: { fontSize: 18, fontWeight: "800", color: "#1E293B" },
+
+  teamCardWrapper: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    overflow: 'hidden',
+  },
+  teamRow: { padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  teamInfo: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  iconCircle: { width: 44, height: 44, borderRadius: 14, backgroundColor: "#FFF7ED", alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  teamName: { fontSize: 16, fontWeight: "800", color: "#1E293B" },
+  teamMeta: { fontSize: 12, color: "#64748B", marginTop: 2 },
+  boldCode: { color: "#FF9F1C", fontWeight: "700" },
+
+  requestBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10 },
+  requestBtnText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+
+  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyText: { fontSize: 14, color: "#94A3B8", marginTop: 10, fontWeight: "500" },
 });

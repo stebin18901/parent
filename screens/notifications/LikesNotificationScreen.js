@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Image,
   TouchableOpacity,
+  SafeAreaView,
 } from "react-native";
 
 import { useAuthStore } from "../../state/useAuthStore";
@@ -54,49 +55,52 @@ export default function LikesNotificationScreen({ navigation }) {
   }, [user?.uid]);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Activity</Text>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
+        <Text style={styles.header}>Activity</Text>
 
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No activity yet.</Text>
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() =>
-              navigation.navigate("PostDetail", {
-                postId: item.postId,
-                postText: item.postText || "",
-              })
-            }
-          >
-            <Image
-              source={{ uri: item.fromPhoto }}
-              style={styles.avatar}
-            />
+        <FlatList
+          data={notifications}
+          keyExtractor={(item) => item.id}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No activity yet.</Text>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() =>
+                navigation.navigate("PostDetail", {
+                  postId: item.postId,
+                  postText: item.postText || "",
+                })
+              }
+            >
+              <Image
+                source={{ uri: item.fromPhoto }}
+                style={styles.avatar}
+              />
 
-            <View style={{ flex: 1 }}>
-              <Text style={styles.text}>
-                <Text style={styles.bold}>{item.fromName}</Text> liked your post
-              </Text>
-
-              {item.postText ? (
-                <Text style={styles.preview} numberOfLines={1}>
-                  {item.postText}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.text}>
+                  <Text style={styles.bold}>{item.fromName}</Text> liked your post
                 </Text>
-              ) : null}
-            </View>
-          </TouchableOpacity>
-        )}
-      />
-    </View>
+
+                {item.postText ? (
+                  <Text style={styles.preview} numberOfLines={1}>
+                    {item.postText}
+                  </Text>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#F5F6F8" },
   container: {
     flex: 1,
     backgroundColor: "#F5F6F8",

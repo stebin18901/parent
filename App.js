@@ -2,6 +2,10 @@
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { View, ActivityIndicator } from "react-native";
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+} from "react-native-safe-area-context";
 import { onAuthStateChanged } from "firebase/auth";
 
 import AuthNavigator from "./navigation/AuthNavigator";
@@ -10,11 +14,10 @@ import AppNavigator from "./navigation/AppNavigator";
 import { auth } from "./firebase/config";
 import { useAuthStore } from "./state/useAuthStore";
 import { useStudentStore } from "./state/useStudentStore";
-
 import { listenToStudentLive } from "./services/firebase/studentLive";
 
-import SpeakProvider from "./providers/SpeakProvider";
-import SubtitleProvider from "./providers/SubtitleProvider";
+import { StatusBar } from "expo-status-bar";
+import * as NavigationBar from "expo-navigation-bar";
 
 export default function App() {
   const user = useAuthStore((s) => s.user);
@@ -25,7 +28,7 @@ export default function App() {
 
   const [booting, setBooting] = useState(true);
 
-  /* ───────── AUTH BOOTSTRAP ───────── */
+  /* AUTH */
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser || null);
@@ -35,7 +38,7 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  /* ───────── LIVE STUDENT DATA ───────── */
+  /* LIVE STUDENT */
   useEffect(() => {
     if (!student?.id) return;
 
@@ -46,6 +49,12 @@ export default function App() {
     return () => unsub && unsub();
   }, [student?.id]);
 
+  /* SYSTEM UI */
+  useEffect(() => {
+    NavigationBar.setBackgroundColorAsync("transparent");
+    NavigationBar.setButtonStyleAsync("light");
+  }, []);
+
   if (booting) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -55,10 +64,15 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      
+    <SafeAreaProvider>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
+
+      {/* ✅ GLOBAL SAFE AREA */}
+      <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
+        <NavigationContainer>
           {user ? <AppNavigator /> : <AuthNavigator />}
-        
-    </NavigationContainer>
+        </NavigationContainer>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }

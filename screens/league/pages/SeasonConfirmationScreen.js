@@ -1,21 +1,22 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function SeasonConfirmationScreen({ navigation }) {
   return (
-    <LinearGradient colors={["#020617", "#000"]} style={styles.container}>
-      <Text style={styles.title}>Slot Secured Successfully</Text>
-      <Text style={styles.sub}>
-        Confirmation sent. We will notify you before season launch.
-      </Text>
-
-      
-    </LinearGradient>
+    <SafeAreaView style={styles.safe}>
+      <LinearGradient colors={["#020617", "#000"]} style={styles.container}>
+        <Text style={styles.title}>Slot Secured Successfully</Text>
+        <Text style={styles.sub}>
+          Confirmation sent. We will notify you before season launch.
+        </Text>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#020617" },
   container: { flex: 1, justifyContent: "center", alignItems: "center" },
   title: { color: "#fff", fontSize: 26, fontWeight: "900" },
   sub: {

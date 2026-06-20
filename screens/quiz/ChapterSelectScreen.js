@@ -9,6 +9,7 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  SafeAreaView,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRoute, useNavigation, useIsFocused } from "@react-navigation/native";
@@ -116,99 +117,106 @@ export default function ChapterSelectScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: COLORS.bgTop }]}>
-        <ActivityIndicator size="large" color={COLORS.gold} />
-      </View>
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={COLORS.gold} />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <LinearGradient colors={[COLORS.bgTop, COLORS.bgMid, COLORS.bgBottom]} style={{ flex: 1 }}>
-      <View style={styles.hero}>
-        <Text style={styles.heroSubject}>{subject}</Text>
-        <Text style={styles.heroSub}>Tap a chapter to manage your topics</Text>
-      </View>
+    <SafeAreaView style={styles.safe}>
+      <LinearGradient colors={[COLORS.bgTop, COLORS.bgMid, COLORS.bgBottom]} style={styles.screen}>
+        <View style={styles.hero}>
+          <Text style={styles.heroSubject}>{subject}</Text>
+          <Text style={styles.heroSub}>Tap a chapter to manage your topics</Text>
+        </View>
 
-      <FlatList
-        data={chapters}
-        keyExtractor={(item) => item}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
-        renderItem={({ item: chapterName }) => {
-          const isExpanded = expandedChapter === chapterName;
-          const topics = conceptMap[chapterName] || [];
+        <FlatList
+          data={chapters}
+          keyExtractor={(item) => item}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item: chapterName }) => {
+            const isExpanded = expandedChapter === chapterName;
+            const topics = conceptMap[chapterName] || [];
 
-          return (
-            <View style={[styles.chapterCard, isExpanded && styles.activeCard]}>
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => toggleChapter(chapterName)}
-                style={styles.chapterHeader}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.chapterTitle}>{chapterName}</Text>
-                  <Text style={styles.topicCount}>
-                    {isExpanded ? "Choose a topic" : `${topics.length || "?"} Topics available`}
-                  </Text>
-                </View>
-                <Ionicons 
-                  name={isExpanded ? "chevron-up" : "chevron-down"} 
-                  size={20} 
-                  color={COLORS.textMuted} 
-                />
-              </TouchableOpacity>
+            return (
+              <View style={[styles.chapterCard, isExpanded && styles.activeCard]}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => toggleChapter(chapterName)}
+                  style={styles.chapterHeader}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.chapterTitle}>{chapterName}</Text>
+                    <Text style={styles.topicCount}>
+                      {isExpanded ? "Choose a topic" : `${topics.length || "?"} Topics available`}
+                    </Text>
+                  </View>
+                  <Ionicons 
+                    name={isExpanded ? "chevron-up" : "chevron-down"} 
+                    size={20} 
+                    color={COLORS.textMuted} 
+                  />
+                </TouchableOpacity>
 
-              {isExpanded && (
-                <View style={styles.topicList}>
-                  {topics.length > 0 ? (
-                    topics.map((item, index) => {
-                      const topicKey = `${chapterName}_${item.concept}`;
-                      const isResumable = resumeMap[topicKey];
-                      const prevScore = scoreMap[topicKey];
+                {isExpanded && (
+                  <View style={styles.topicList}>
+                    {topics.length > 0 ? (
+                      topics.map((item, index) => {
+                        const topicKey = `${chapterName}_${item.concept}`;
+                        const isResumable = resumeMap[topicKey];
+                        const prevScore = scoreMap[topicKey];
 
-                      return (
-                        <View key={index} style={styles.topicRow}>
-                          <View style={{ flex: 1, paddingRight: 10 }}>
-                            <Text style={styles.topicName}>{item.concept}</Text>
-                            {prevScore && !isResumable && (
-                                <Text style={styles.scoreBadge}>Last Score: {prevScore}%</Text>
-                            )}
+                        return (
+                          <View key={index} style={styles.topicRow}>
+                            <View style={{ flex: 1, paddingRight: 10 }}>
+                              <Text style={styles.topicName}>{item.concept}</Text>
+                              {prevScore && !isResumable && (
+                                  <Text style={styles.scoreBadge}>Last Score: {prevScore}%</Text>
+                              )}
+                            </View>
+                            
+                            <TouchableOpacity 
+                              onPress={() => handleStartTopic(chapterName, item.concept)}
+                              style={[
+                                  styles.topicBtn, 
+                                  isResumable ? styles.btnResume : prevScore ? styles.btnRetry : styles.btnStart
+                              ]}
+                            >
+                              <Text style={[
+                                  styles.topicBtnText, 
+                                  { color: isResumable ? COLORS.success : prevScore ? COLORS.textMain : COLORS.gold }
+                              ]}>
+                                {isResumable ? "RESUME" : prevScore ? `${prevScore}% RETRY` : "START"}
+                              </Text>
+                            </TouchableOpacity>
                           </View>
-                          
-                          <TouchableOpacity 
-                            onPress={() => handleStartTopic(chapterName, item.concept)}
-                            style={[
-                                styles.topicBtn, 
-                                isResumable ? styles.btnResume : prevScore ? styles.btnRetry : styles.btnStart
-                            ]}
-                          >
-                            <Text style={[
-                                styles.topicBtnText, 
-                                { color: isResumable ? COLORS.success : prevScore ? COLORS.textMain : COLORS.gold }
-                            ]}>
-                              {isResumable ? "RESUME" : prevScore ? `${prevScore}% RETRY` : "START"}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      );
-                    })
-                  ) : (
-                    <ActivityIndicator color={COLORS.gold} style={{ margin: 20 }} />
-                  )}
-                </View>
-              )}
-            </View>
-          );
-        }}
-      />
-    </LinearGradient>
+                        );
+                      })
+                    ) : (
+                      <ActivityIndicator color={COLORS.gold} style={{ margin: 20 }} />
+                    )}
+                  </View>
+                )}
+              </View>
+            );
+          }}
+        />
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: COLORS.bgTop },
+  screen: { flex: 1 },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  hero: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 20 },
+  hero: { paddingTop: 16, paddingHorizontal: 24, paddingBottom: 16 },
   heroSubject: { fontSize: 32, fontWeight: "800", color: "#FFF" },
   heroSub: { fontSize: 14, color: COLORS.textMuted, marginTop: 4 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 100 },
 
   chapterCard: {
     backgroundColor: COLORS.glass,

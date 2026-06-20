@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList, Image, StyleSheet } from "react-native";
+import { View, Text, FlatList, Image, StyleSheet, SafeAreaView } from "react-native";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { LinearGradient } from "expo-linear-gradient";
@@ -22,37 +22,40 @@ export default function PostLikesScreen({ route }) {
   }, [postId]);
 
   return (
-    <LinearGradient
-      colors={["#F8FAFF", "#FFF4EC"]}
-      style={styles.container}
-    >
-      <Text style={styles.title}>Liked By</Text>
+    <SafeAreaView style={styles.safe}>
+      <LinearGradient
+        colors={["#F8FAFF", "#FFF4EC"]}
+        style={styles.container}
+      >
+        <Text style={styles.title}>Liked By</Text>
 
-      <FlatList
-        data={likes}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        renderItem={({ item }) => (
-          <LinearGradient
-            colors={["#FFFFFF", "#F8FAFC"]}
-            style={styles.row}
-          >
-            <Image source={{ uri: item.photo }} style={styles.avatar} />
-            <Text style={styles.name}>{item.name}</Text>
-          </LinearGradient>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>No likes yet.</Text>
-        }
-      />
-    </LinearGradient>
+        <FlatList
+          data={likes}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          renderItem={({ item }) => (
+            <LinearGradient
+              colors={["#FFFFFF", "#F8FAFC"]}
+              style={styles.row}
+            >
+              <Image source={{ uri: item.photo }} style={styles.avatar} />
+              <Text style={styles.name}>{item.name}</Text>
+            </LinearGradient>
+          )}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No likes yet.</Text>
+          }
+        />
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
 /* ✅ PREMIUM GRADIENT STYLES */
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#F8FAFF" },
   container: {
     flex: 1,
     padding: 16,

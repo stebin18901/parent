@@ -9,7 +9,10 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
+  useWindowDimensions,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { createStudent } from "../../services/firebase/student";
 import { useAuthStore } from "../../state/useAuthStore";
 
@@ -18,6 +21,7 @@ export default function CreateStudentScreen({ navigation }) {
   const [studentClass, setStudentClass] = useState("");
   const [section, setSection] = useState("");
   const [loading, setLoading] = useState(false);
+  const { width } = useWindowDimensions();
 
   const parent = useAuthStore((state) => state.user);
 
@@ -44,67 +48,56 @@ export default function CreateStudentScreen({ navigation }) {
     }
   };
 
+  const cardWidth = Math.min(width - 32, 560);
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <View style={styles.card}>
-        <Text style={styles.title}>Create Student</Text>
+    <SafeAreaView style={styles.safe}>
+      <LinearGradient colors={["#F8FAFF", "#EEF2FF"]} style={styles.gradient}>
+        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <View style={[styles.card, { width: cardWidth }]}>
+            <Text style={styles.title}>Create Student</Text>
 
-        <TextInput
-          placeholder="Student Name"
-          value={name}
-          onChangeText={setName}
-          style={styles.input}
-        />
+            <TextInput placeholder="Student Name" value={name} onChangeText={setName} style={styles.input} />
 
-        <TextInput
-          placeholder="Class (eg: 6)"
-          value={studentClass}
-          onChangeText={setStudentClass}
-          style={styles.input}
-        />
+            <TextInput placeholder="Class (eg: 6)" value={studentClass} onChangeText={setStudentClass} style={styles.input} />
 
-        <TextInput
-          placeholder="Section (optional)"
-          value={section}
-          onChangeText={setSection}
-          style={styles.input}
-        />
+            <TextInput placeholder="Section (optional)" value={section} onChangeText={setSection} style={styles.input} />
 
-        <TouchableOpacity style={styles.button} onPress={handleCreate}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Create Student</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+            <TouchableOpacity style={styles.button} onPress={handleCreate} disabled={loading}>
+              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Create Student</Text>}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
-/* ✅ PREMIUM STYLES */
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
     backgroundColor: "#F5F6F8",
+  },
+  gradient: {
+    flex: 1,
+  },
+  container: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
   },
   card: {
-    width: "100%",
     backgroundColor: "#FFFFFF",
     borderRadius: 28,
     padding: 28,
-
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
     elevation: 10,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
   },
   title: {
     fontSize: 26,
@@ -130,7 +123,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     marginTop: 12,
-
     shadowColor: "#FF9F1C",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
@@ -143,3 +135,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+

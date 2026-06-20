@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage"; // Added for local persistence
 import { useRoute, useNavigation } from "@react-navigation/native";
 import { useStudentStore } from "../../state/useStudentStore";
-import { saveQuizAttempt } from "../../services/firebase/quiz";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -28,19 +27,7 @@ export default function QuizReportScreen() {
       if (!student?.id || saved) return;
 
       try {
-        // 1. Save to Firebase for long-term records
-        await saveQuizAttempt({
-          studentId: student.id,
-          subject,
-          chapter,
-          topic, 
-          total,
-          correct,
-          scorePercent,
-          timestamp: new Date().toISOString(),
-        });
-
-        // 2. Save locally so ChapterSelectScreen can show the score immediately
+        // Save locally so ChapterSelectScreen can show the score immediately
         const resultKey = `quiz_result_${student.id}_${subject}_${chapter}_${topic}`;
         await AsyncStorage.setItem(resultKey, scorePercent.toString());
 
@@ -72,7 +59,8 @@ export default function QuizReportScreen() {
   }
 
   return (
-    <LinearGradient colors={["#F8FAFF", "#FFF4EC"]} style={styles.root}>
+    <SafeAreaView style={styles.safe}>
+      <LinearGradient colors={["#F8FAFF", "#FFF4EC"]} style={styles.root}>
       {/* HEADER */}
       <View style={styles.header}>
         <Text style={styles.title}>Topic Completed</Text>
@@ -119,7 +107,8 @@ export default function QuizReportScreen() {
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </LinearGradient>
+      </LinearGradient>
+    </SafeAreaView>
   );
 }
 
@@ -131,7 +120,8 @@ const StatItem = ({ label, value, colors, textColor = "#111827" }) => (
 );
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: 24, paddingTop: 60 },
+  safe: { flex: 1, backgroundColor: "#F8FAFF" },
+  root: { flex: 1, padding: 24, paddingTop: 28 },
   header: { marginBottom: 30 },
   title: { fontSize: 28, fontWeight: "900", color: "#111827" },
   subTitle: { fontSize: 14, color: "#6B7280", marginTop: 4, fontWeight: "600" },

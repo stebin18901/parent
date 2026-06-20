@@ -8,66 +8,63 @@ import {
 } from "firebase/firestore";
 import { db } from "../../firebase/config";
 
-/**
- * ✅ Live stats for a student
- * Expects document at: studentStats/{studentId}
- * Gracefully falls back to defaults if missing.
- */
 export const listenToStudentStats = (studentId, callback) => {
   if (!studentId) return () => {};
 
-  const statsRef = doc(db, "studentStats", studentId);
+  const studentRef = doc(db, "students", studentId);
 
   return onSnapshot(
-    statsRef,
+    studentRef,
     (snap) => {
       if (!snap.exists()) {
         callback({
-          contestsPlayed: 0,
-          wins: 0,
-          podiums: 0,
+          quizzesCompleted: 0,
+          avgScore: 0,
+          avgAccuracy: 0,
         });
-      } else {
-        const data = snap.data();
-        callback({
-          contestsPlayed: data.contestsPlayed ?? 0,
-          wins: data.wins ?? 0,
-          podiums: data.podiums ?? 0,
-        });
+        return;
       }
+
+      const data = snap.data();
+      callback({
+        quizzesCompleted: data.totalQuizzesAttempted ?? 0,
+        avgScore: Math.round(data.avgScore ?? 0),
+        avgAccuracy: Math.round(data.avgAccuracy ?? 0),
+      });
     },
     () => {
-      // On error, still give safe defaults
       callback({
-        contestsPlayed: 0,
-        wins: 0,
-        podiums: 0,
+        quizzesCompleted: 0,
+        avgScore: 0,
+        avgAccuracy: 0,
       });
     }
   );
 };
 
-/**
- * ✅ Recent contest history (latest 10)
- * Expects documents at: studentHistory/{studentId}/contests/{docId}
- */
-export const listenToStudentHistory = (studentId, callback) => {
+export const listenToStudentHistory = (studentId, callback, maxItems = 20) => {
   if (!studentId) return () => {};
 
-  const historyRef = collection(db, "studentHistory", studentId, "contests");
-  const q = query(historyRef, orderBy("playedAt", "desc"), limit(10));
+  const historyRef = collection(db, "studentHistory", studentId, "quizzes");
+  const q = query(historyRef, orderBy("playedAt", "desc"), limit(maxItems));
 
   return onSnapshot(
     q,
     (snapshot) => {
-      const items = snapshot.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
+      const items = snapshot.docs.map((docSnap) => {
+        const d = docSnap.data();
+        return {
+          id: docSnap.id,
+          subject: d.subject || "Subject",
+          chapter: d.chapter || "Chapter",
+          scorePercent: d.scorePercent ?? 0,
+          correctAnswers: d.correctAnswers ?? 0,
+          totalQuestions: d.totalQuestions ?? 0,
+          playedAt: d.playedAt,
+        };
+      });
       callback(items);
     },
-    () => {
-      callback([]);
-    }
+    () => callback([])
   );
 };

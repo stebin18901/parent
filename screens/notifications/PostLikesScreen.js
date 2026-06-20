@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Image,
   TouchableOpacity,
+  SafeAreaView,
 } from "react-native";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { db } from "../../firebase/config";
@@ -37,46 +38,51 @@ export default function PostLikesScreen({ route, navigation }) {
 
   if (loading) {
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#FF9F1C" />
-      </View>
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color="#FF9F1C" />
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Liked By</Text>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
+        <Text style={styles.title}>Liked By</Text>
 
-      <FlatList
-        data={likes}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.row}>
-            <Image
-              source={{
-                uri:
-                  item.photo ||
-                  "https://ui-avatars.com/api/?background=FF9F1C&color=fff&name=Student",
-              }}
-              style={styles.avatar}
-            />
+        <FlatList
+          data={likes}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.row}>
+              <Image
+                source={{
+                  uri:
+                    item.photo ||
+                    "https://ui-avatars.com/api/?background=FF9F1C&color=fff&name=Student",
+                }}
+                style={styles.avatar}
+              />
 
-            <View style={styles.info}>
-              <Text style={styles.name}>{item.name || "Student"}</Text>
-              <Text style={styles.role}>{item.role || "USER"}</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No likes yet.</Text>
-        }
-      />
-    </View>
+              <View style={styles.info}>
+                <Text style={styles.name}>{item.name || "Student"}</Text>
+                <Text style={styles.role}>{item.role || "USER"}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No likes yet.</Text>
+          }
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
 /* ✅ PREMIUM STYLES */
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#F5F6F8" },
   container: {
     flex: 1,
     backgroundColor: "#F5F6F8",

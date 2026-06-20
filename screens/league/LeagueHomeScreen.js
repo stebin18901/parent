@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Linking,
+  SafeAreaView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -119,7 +120,8 @@ export default function LeagueHomeScreen() {
   /* ───────── UI ───────── */
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#000" }}>
+    <SafeAreaView style={styles.safe}>
+      <View style={{ flex: 1, backgroundColor: "#000" }}>
       {/* BACKGROUND PREVIEW */}
       <View style={{ flex: 1, opacity: 0.25 }}>
         <LinearGradient
@@ -223,7 +225,8 @@ export default function LeagueHomeScreen() {
           </ScrollView>
         </LinearGradient>
       </View>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -239,7 +242,8 @@ const Feature = ({ icon, text }) => (
 /* ───────── STYLES ───────── */
 
 const styles = StyleSheet.create({
-  header: { paddingTop: 60, paddingHorizontal: 24 },
+  safe: { flex: 1, backgroundColor: "#000" },
+  header: { paddingTop: 18, paddingHorizontal: 24 },
   leagueTitle: { fontSize: 26, fontWeight: "900", color: "#fff" },
   leagueMeta: { fontSize: 13, color: COLORS.textMuted },
   sectionTitle: {
@@ -254,7 +258,7 @@ const styles = StyleSheet.create({
   fullScreen: { flex: 1, paddingHorizontal: 30 },
   scrollContent: {
     alignItems: "center",
-    paddingTop: height * 0.15,
+    paddingTop: height * 0.12,
     paddingBottom: 50,
   },
 
