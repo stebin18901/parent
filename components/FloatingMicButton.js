@@ -7,11 +7,13 @@ import {
   Dimensions,
   Image,
   Animated,
-  Easing,
   Platform,
   Vibration,
 } from "react-native";
-import Voice from "@react-native-voice/voice";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 import { sendSubtitle } from "../services/firebase/teamSubtitles";
 
 const { width: W, height: H } = Dimensions.get("window");
@@ -21,7 +23,6 @@ const BUTTON_SIZE = 70;
 const ICON_SIZE = 58;
 const MENU_RADIUS = 125;
 const LONG_PRESS_MS = 250;
-const EDGE_PADDING = 15;
 const AUTO_HIDE_MS = 5000;
 const PEEK_WIDTH = 20;
 
@@ -35,17 +36,17 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
 
   const lastFreePos = useRef({ left: 20, top: H - 160 });
   const docked = useRef(false);
-  
+
   /* ---------- Logical Refs ---------- */
   const holdingMode = useRef(false);
   const currentTarget = useRef(null);
   const holdTimer = useRef(null);
   const inactivityTimer = useRef(null);
-  const isRecording = useRef(false);
 
   /* ---------- State ---------- */
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
   const [volume, setVolume] = useState(0);
 
   /* ================== INACTIVITY LOGIC ======================= */
@@ -57,14 +58,14 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
   };
 
   const dockToEdge = () => {
-    if (holdingMode.current || isRecording.current) return;
+    if (holdingMode.current || isRecording) return;
     docked.current = true;
     const side = lastFreePos.current.left < W / 2 ? "left" : "right";
-    const dockLeft = side === "left" ? - (BUTTON_SIZE - PEEK_WIDTH) : W - PEEK_WIDTH;
+    const dockLeft = side === "left" ? -(BUTTON_SIZE - PEEK_WIDTH) : W - PEEK_WIDTH;
 
     Animated.parallel([
       Animated.timing(animatedLeft, { toValue: dockLeft, duration: 400, useNativeDriver: false }),
-      Animated.timing(opacityAnim, { toValue: 0.5, duration: 400, useNativeDriver: false })
+      Animated.timing(opacityAnim, { toValue: 0.5, duration: 400, useNativeDriver: false }),
     ]).start();
   };
 
@@ -72,67 +73,87 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
     docked.current = false;
     Animated.parallel([
       Animated.timing(animatedLeft, { toValue: lastFreePos.current.left, duration: 250, useNativeDriver: false }),
-      Animated.timing(opacityAnim, { toValue: 1, duration: 250, useNativeDriver: false })
+      Animated.timing(opacityAnim, { toValue: 1, duration: 250, useNativeDriver: false }),
     ]).start();
   };
 
   /* ================= VOICE & FIREBASE STREAMING ================= */
 
+  useSpeechRecognitionEvent("start", () => {
+    setIsRecording(true);
+    Vibration.vibrate(40);
+  });
+
+  useSpeechRecognitionEvent("result", (event) => {
+    const text = event.results?.[0]?.transcript?.trim();
+    if (!text || !currentTarget.current || !student) return;
+
+    sendSubtitle(currentTarget.current.id, student, text, !event.isFinal);
+  });
+
+  useSpeechRecognitionEvent("error", (event) => {
+    console.error("Speech Recognition Error", event);
+    setIsRecording(false);
+  });
+
+  useSpeechRecognitionEvent("volumechange", (event) => {
+    setVolume(event.value || 0);
+  });
+
+  useSpeechRecognitionEvent("end", () => {
+    setIsRecording(false);
+  });
+
   useEffect(() => {
-    Voice.onSpeechStart = () => {
-      isRecording.current = true;
-      Vibration.vibrate(40);
-    };
-
-    Voice.onSpeechPartialResults = (e) => {
-      const text = e.value?.[0];
-      if (!text || !currentTarget.current || !student) return;
-      // Stream partials with a 'isPartial' flag for live UI updates on receiver end
-      sendSubtitle(currentTarget.current.id, student, text, true);
-    };
-
-    Voice.onSpeechResults = (e) => {
-      const text = e.value?.[0];
-      if (!text || !currentTarget.current || !student) return;
-      // Send final result
-      sendSubtitle(currentTarget.current.id, student, text, false);
-    };
-
-    Voice.onSpeechVolumeChanged = (e) => {
-      setVolume(e.value || 0);
-    };
-
     return () => {
-      Voice.destroy().then(Voice.removeAllListeners);
+      ExpoSpeechRecognitionModule.stop();
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
     };
-  }, [student]);
+  }, []);
 
-  // Voice Pulse Animation
   useEffect(() => {
-    if (isRecording.current) {
-      Animated.loop(
+    if (isRecording) {
+      const pulse = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, { toValue: 1.3, duration: 400, useNativeDriver: true }),
           Animated.timing(pulseAnim, { toValue: 1.1, duration: 400, useNativeDriver: true }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
+        ]),
+      );
+      pulse.start();
+      return () => {
+        pulse.stop();
+        pulseAnim.setValue(1);
+      };
     }
-  }, [isRecording.current]);
+
+    pulseAnim.setValue(1);
+  }, [isRecording, pulseAnim]);
 
   const startVoice = async () => {
     try {
-      await Voice.start("en-US");
-    } catch (e) { console.error("Voice Start Error", e); }
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!permission.granted) {
+        setIsRecording(false);
+        return;
+      }
+
+      ExpoSpeechRecognitionModule.start({
+        lang: "en-US",
+        interimResults: true,
+        addsPunctuation: true,
+      });
+    } catch (e) {
+      console.error("Speech Recognition Start Error", e);
+    }
   };
 
   const stopVoice = async () => {
     try {
-      await Voice.stop();
-      isRecording.current = false;
-    } catch (e) { console.error("Voice Stop Error", e); }
+      ExpoSpeechRecognitionModule.stop();
+      setIsRecording(false);
+    } catch (e) {
+      console.error("Speech Recognition Stop Error", e);
+    }
   };
 
   /* ================= PAN GESTURE SYSTEM ================= */
@@ -145,7 +166,7 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
         holdTimer.current = setTimeout(() => {
           holdingMode.current = true;
           setMenuOpen(true);
-          Vibration.vibrate(Platform.OS === 'ios' ? 1 : 10);
+          Vibration.vibrate(Platform.OS === "ios" ? 1 : 10);
           Animated.spring(scaleAnim, { toValue: 1, friction: 8, useNativeDriver: true }).start();
         }, LONG_PRESS_MS);
       },
@@ -154,7 +175,6 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
         resetInactivity();
         const { pageX, pageY } = evt.nativeEvent;
 
-        // Mode 1: Repositioning
         if (!holdingMode.current) {
           const newLeft = pageX - BUTTON_SIZE / 2;
           const newTop = pageY - BUTTON_SIZE / 2;
@@ -164,35 +184,33 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
           return;
         }
 
-        // Mode 2: Selecting / Routing
         const centerX = lastFreePos.current.left + BUTTON_SIZE / 2;
         const centerY = lastFreePos.current.top + BUTTON_SIZE / 2;
         const dx = pageX - centerX;
         const dy = pageY - centerY;
         const dist = Math.hypot(dx, dy);
 
-        // Cancellation Zone (Back to center)
         if (dist < BUTTON_SIZE / 1.5) {
-          if (isRecording.current) stopVoice();
+          if (isRecording) stopVoice();
           setActiveIdx(null);
           currentTarget.current = null;
           return;
         }
 
-        // Target Detection Logic
         let angle = Math.atan2(dy, dx);
         if (angle < 0) angle += Math.PI * 2;
-        
-        // We only care about the top semi-circle (PI to 2PI)
+
         if (angle >= Math.PI && angle <= Math.PI * 2) {
           const t = (angle - Math.PI) / Math.PI;
           const idx = Math.round(t * (teams.length - 1));
-          
+
           if (idx !== activeIdx && teams[idx]) {
             Vibration.vibrate(5);
             setActiveIdx(idx);
             currentTarget.current = teams[idx];
-            startVoice();
+            if (!isRecording) {
+              startVoice();
+            }
           }
         }
       },
@@ -207,7 +225,7 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
         Animated.timing(scaleAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
         resetInactivity();
       },
-    })
+    }),
   ).current;
 
   /* ================= RENDERING ================= */
@@ -216,9 +234,9 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
     const n = Math.max(1, teams.length);
     const t = n === 1 ? 0.5 : i / (n - 1);
     const angle = Math.PI + Math.PI * t;
-    return { 
-      x: Math.cos(angle) * MENU_RADIUS, 
-      y: Math.sin(angle) * MENU_RADIUS 
+    return {
+      x: Math.cos(angle) * MENU_RADIUS,
+      y: Math.sin(angle) * MENU_RADIUS,
     };
   };
 
@@ -230,7 +248,6 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
       ]}
       {...panResponder.panHandlers}
     >
-      {/* Target Menu */}
       <Animated.View style={[styles.radial, { transform: [{ scale: scaleAnim }] }]}>
         {teams.map((t, i) => {
           const pos = getTargetPos(i);
@@ -240,7 +257,7 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
               key={t.id}
               style={[
                 styles.itemContainer,
-                { transform: [{ translateX: pos.x }, { translateY: pos.y }] }
+                { transform: [{ translateX: pos.x }, { translateY: pos.y }] },
               ]}
             >
               <View style={[styles.iconBg, isActive && styles.activeIconBg]}>
@@ -258,12 +275,11 @@ export default function FloatingMicButton({ teams = [], student, teamId: propTea
         })}
       </Animated.View>
 
-      {/* Main Mic Button */}
-      <View style={[styles.button, isRecording.current && styles.buttonRecording]}>
-        {isRecording.current && (
-           <Animated.View style={[styles.pulse, { transform: [{ scale: pulseAnim }] }]} />
+      <View style={[styles.button, isRecording && styles.buttonRecording]}>
+        {isRecording && (
+          <Animated.View style={[styles.pulse, { transform: [{ scale: pulseAnim }] }]} />
         )}
-        <Text style={styles.micIcon}>{isRecording.current ? "🛑" : "🎙️"}</Text>
+        <Text style={styles.micIcon}>{isRecording ? "Stop" : "Mic"}</Text>
       </View>
     </Animated.View>
   );
@@ -309,9 +325,9 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
     marginTop: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowColor: "rgba(0, 0, 0, 0.75)",
     textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10
+    textShadowRadius: 10,
   },
   button: {
     width: BUTTON_SIZE,
@@ -327,7 +343,7 @@ const styles = StyleSheet.create({
   buttonRecording: {
     backgroundColor: "#E53E3E",
   },
-  micIcon: { fontSize: 26 },
+  micIcon: { fontSize: 18, fontWeight: "700", color: "#FFF" },
   pulse: {
     position: "absolute",
     width: BUTTON_SIZE,

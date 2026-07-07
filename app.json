@@ -6,12 +6,6 @@
     "orientation": "portrait",
     "icon": "https://firebasestorage.googleapis.com/v0/b/dreamprojects-cda5b.appspot.com/o/logo%2Flogo.png?alt=media&token=1002c533-d79a-4bc8-897d-66132723272c",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "https://firebasestorage.googleapis.com/v0/b/dreamprojects-cda5b.appspot.com/o/logo%2Flogo.png?alt=media&token=1002c533-d79a-4bc8-897d-66132723272c",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -28,7 +22,6 @@
         "foregroundImage": "https://firebasestorage.googleapis.com/v0/b/dreamprojects-cda5b.appspot.com/o/logo%2Flogo.png?alt=media&token=1002c533-d79a-4bc8-897d-66132723272c",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.parentsocial"
     },
     "plugins": [
@@ -40,11 +33,10 @@
         }
       ],
       "./plugins/withAndroidManifestFix",
-      "./plugins/withAndroidXOnly"
+      "./plugins/withAndroidXOnly",
+      "expo-font",
+      "expo-status-bar"
     ],
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
     "extra": {
       "eas": {
         "projectId": "3454e6fb-9a94-4a77-a7d8-50a6d02fa9fc"

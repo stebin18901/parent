@@ -1,39 +1,62 @@
 import React, { useEffect, useState } from "react";
 import { TouchableOpacity, Text, StyleSheet, View } from "react-native";
-import Voice from "@react-native-voice/voice";
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from "expo-speech-recognition";
 import { sendSubtitle } from "../services/firebase/teamSubtitles";
 
 export default function MicButton({ teamId, student }) {
   const [isListening, setIsListening] = useState(false);
 
-  useEffect(() => {
-    Voice.onSpeechResults = (e) => {
-      const text = e.value[0];
-      if (text) {
-        sendSubtitle(teamId, student, text);
-      }
-    };
+  useSpeechRecognitionEvent("result", (event) => {
+    const text = event.results?.[0]?.transcript?.trim();
+    if (event.isFinal && text) {
+      sendSubtitle(teamId, student, text);
+    }
+  });
 
+  useSpeechRecognitionEvent("error", (event) => {
+    console.log("Speech Recognition Error:", event);
+    setIsListening(false);
+  });
+
+  useSpeechRecognitionEvent("end", () => {
+    setIsListening(false);
+  });
+
+  useEffect(() => {
     return () => {
-      Voice.destroy().then(Voice.removeAllListeners);
+      ExpoSpeechRecognitionModule.stop();
     };
   }, []);
 
   const startListening = async () => {
-    setIsListening(true);
     try {
-      await Voice.start("en-US");
+      const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!permission.granted) {
+        setIsListening(false);
+        return;
+      }
+
+      setIsListening(true);
+      ExpoSpeechRecognitionModule.start({
+        lang: "en-US",
+        interimResults: false,
+        addsPunctuation: true,
+      });
     } catch (e) {
-      console.log("Voice Start Error:", e);
+      setIsListening(false);
+      console.log("Speech Recognition Start Error:", e);
     }
   };
 
   const stopListening = async () => {
     setIsListening(false);
     try {
-      await Voice.stop();
+      ExpoSpeechRecognitionModule.stop();
     } catch (e) {
-      console.log("Voice Stop Error:", e);
+      console.log("Speech Recognition Stop Error:", e);
     }
   };
 

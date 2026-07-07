@@ -25,7 +25,11 @@ import {
 } from "../../services/firebase/team";
 import { LinearGradient } from "expo-linear-gradient";
 
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+if (
+  Platform.OS === "android" &&
+  !global?.nativeFabricUIManager &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 

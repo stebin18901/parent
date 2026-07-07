@@ -15,6 +15,7 @@ import { auth } from "./firebase/config";
 import { useAuthStore } from "./state/useAuthStore";
 import { useStudentStore } from "./state/useStudentStore";
 import { listenToStudentLive } from "./services/firebase/studentLive";
+import VersionGuard from "./components/VersionGuard";
 
 import { StatusBar } from "expo-status-bar";
 import * as NavigationBar from "expo-navigation-bar";
@@ -51,8 +52,13 @@ export default function App() {
 
   /* SYSTEM UI */
   useEffect(() => {
-    NavigationBar.setBackgroundColorAsync("transparent");
-    NavigationBar.setButtonStyleAsync("light");
+    if (typeof NavigationBar.setBackgroundColorAsync === "function") {
+      NavigationBar.setBackgroundColorAsync("transparent");
+    }
+
+    if (typeof NavigationBar.setButtonStyleAsync === "function") {
+      NavigationBar.setButtonStyleAsync("light");
+    }
   }, []);
 
   if (booting) {
@@ -69,9 +75,11 @@ export default function App() {
 
       {/* ✅ GLOBAL SAFE AREA */}
       <SafeAreaView style={{ flex: 1 }} edges={["bottom"]}>
-        <NavigationContainer>
-          {user ? <AppNavigator /> : <AuthNavigator />}
-        </NavigationContainer>
+        <VersionGuard>
+          <NavigationContainer>
+            {user ? <AppNavigator /> : <AuthNavigator />}
+          </NavigationContainer>
+        </VersionGuard>
       </SafeAreaView>
     </SafeAreaProvider>
   );
